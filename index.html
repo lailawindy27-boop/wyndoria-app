@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wyndoria - Tiket Wahana Rekreasi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #6BCB77;
+            --secondary: #4D96FF;
+            --accent: #FFF3E2;
+            --dark: #2D3436;
+        }
+        body {
+            background-color: var(--accent);
+            color: var(--dark);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .bg-primary { background-color: var(--primary); }
+        .bg-secondary { background-color: var(--secondary); }
+        
+        .card-wahana { transition: transform 0.3s ease; }
+        .card-wahana:hover { transform: translateY(-5px); }
+
+        /* Style Struk */
+        .receipt-container {
+            background: white;
+            max-width: 380px;
+            margin: 0 auto;
+            padding: 25px;
+            border: 1px solid #eee;
+            position: relative;
+        }
+        .receipt-container::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background-image: radial-gradient(circle at 10px 10px, white 10px, transparent 0);
+            background-size: 20px 10px;
+        }
+
+        .hidden { display: none; }
+
+        /* Tombol ganti foto per wahana */
+        .btn-change-individual {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(2px);
+            z-index: 20;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-change-individual:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .barcode-stripes {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            height: 50px;
+            gap: 2px;
+        }
+        .stripe { background: black; width: 2px; height: 100%; }
+        .stripe.w-1 { width: 1px; }
+        .stripe.w-3 { width: 3px; }
+        .stripe.short { height: 80%; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <header class="bg-primary text-white p-6 shadow-lg text-center">
+        <h1 class="text-3xl font-bold tracking-wider">WYNDORIA</h1>
+        <p class="text-sm opacity-90">Petualangan Tanpa Batas</p>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        
+        <section id="section-menu">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-ticket-alt mr-2 text-secondary"></i> Pilih Wahana
+                </h2>
+                <span class="text-[10px] text-gray-500 bg-white px-2 py-1 rounded-full shadow-sm">Klik ikon kamera untuk ganti foto</span>
+            </div>
+            <div id="wahana-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- Input file global yang digunakan oleh fungsi trigger -->
+        <input type="file" id="global-file-input" class="hidden" accept="image/*">
+
+        <!-- Section Pembayaran -->
+        <section id="section-payment" class="hidden max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-xl">
+            <button onclick="showMenu()" class="mb-4 text-secondary font-bold"><i class="fas fa-arrow-left"></i> Kembali</button>
+            <h2 class="text-2xl font-bold mb-4">Pembayaran</h2>
+            <div id="payment-summary" class="mb-6 p-4 bg-gray-50 rounded-lg"></div>
+            
+            <div class="space-y-4">
+                <label class="block font-bold">Metode Pembayaran:</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="selectMethod('DANA')" class="payment-method-btn p-4 border-2 rounded-xl text-center transition">
+                        <i class="fas fa-wallet text-2xl mb-1 text-blue-500"></i><br><span class="text-xs">DANA</span>
+                    </button>
+                    <button onclick="selectMethod('QRIS')" class="payment-method-btn p-4 border-2 rounded-xl text-center transition">
+                        <i class="fas fa-qrcode text-2xl mb-1 text-red-500"></i><br><span class="text-xs">QRIS</span>
+                    </button>
+                    <button onclick="selectMethod('CASH')" class="payment-method-btn p-4 border-2 rounded-xl text-center transition">
+                        <i class="fas fa-money-bill-wave text-2xl mb-1 text-green-500"></i><br><span class="text-xs">CASH</span>
+                    </button>
+                </div>
+
+                <div id="qr-area" class="hidden mt-6 text-center border-t pt-6">
+                    <p class="font-bold mb-2">Scan QR Code:</p>
+                    <div class="bg-gray-100 p-8 inline-block rounded-lg mb-4">
+                         <i class="fas fa-qrcode text-8xl"></i>
+                    </div>
+                    <button onclick="processFinal()" class="w-full bg-primary text-white py-3 rounded-lg font-bold">KONFIRMASI BAYAR</button>
+                </div>
+
+                <div id="cash-area" class="hidden mt-6 text-center border-t pt-6">
+                    <p class="mb-4 text-sm text-gray-600">Bayar di loket kasir Wyndoria.</p>
+                    <button onclick="processFinal()" class="w-full bg-secondary text-white py-3 rounded-lg font-bold">LIHAT STRUK</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section Struk -->
+        <section id="section-receipt" class="hidden">
+            <div id="receipt-to-download" class="receipt-container shadow-2xl rounded-sm mx-auto">
+                <div class="text-center border-b-2 border-dashed pb-4 mb-4">
+                    <h2 class="text-2xl font-black text-primary">WYNDORIA</h2>
+                    <p class="text-[10px] uppercase tracking-widest">Theme Park & Recreation</p>
+                    <p class="text-[9px] text-gray-400 mt-1" id="receipt-date"></p>
+                </div>
+                
+                <div id="receipt-items" class="space-y-2 text-xs mb-4"></div>
+                
+                <div class="border-t border-b border-dashed py-3 my-4">
+                    <div class="flex justify-between font-bold text-base">
+                        <span>TOTAL</span>
+                        <span id="receipt-total" class="text-secondary"></span>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+                        <span>METODE</span>
+                        <span id="receipt-method"></span>
+                    </div>
+                </div>
+
+                <div class="text-center mt-6">
+                    <div class="barcode-stripes mb-2">
+                        <div class="stripe w-3"></div><div class="stripe w-1 short"></div><div class="stripe w-2"></div>
+                        <div class="stripe w-1 short"></div><div class="stripe w-1"></div><div class="stripe w-3 short"></div>
+                        <div class="stripe w-2"></div><div class="stripe w-1 short"></div><div class="stripe w-3"></div>
+                    </div>
+                    <p class="text-[10px] font-mono tracking-[0.3em]" id="order-id"></p>
+                    <p class="text-[8px] text-gray-400 mt-4 italic">Tunjukkan struk ini di pintu masuk wahana.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-center gap-3 mt-8">
+                <button onclick="downloadReceipt()" class="w-full max-w-[380px] bg-secondary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fas fa-download"></i> DOWNLOAD STRUK (PNG)
+                </button>
+                <button onclick="location.reload()" class="w-full max-w-[380px] bg-gray-200 text-gray-700 py-3 rounded-xl font-bold">
+                    PESAN LAGI
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const savedData = localStorage.getItem('wyndoria_wahana');
+        const defaultWahana = [
+            { id: 1, nama: 'Bianglala', deskripsi: 'Pemandangan kota dari ketinggian.', harga: 35000, img: 'bianglala.jpg' },
+            { id: 2, nama: 'Kora-Kora', deskripsi: 'Kapal bajak laut raksasa.', harga: 30000, img: 'kora-kora.jpg' },
+            { id: 3, nama: 'Hysteria', deskripsi: 'Terjun bebas dari ketinggian.', harga: 45000, img: 'hysteria.jpg' },
+            { id: 4, nama: 'Tornado', deskripsi: 'Rotasi udara ekstrem.', harga: 50000, img: 'tornado.jpg' },
+            { id: 5, nama: 'Baling-Baling', deskripsi: 'Wahana pusing yang menantang.', harga: 40000, img: 'baling-baling.jpg' },
+            { id: 6, nama: 'Arung Jeram', deskripsi: 'Sungai buatan deras dan basah.', harga: 55000, img: 'arung-jeram.jpg' },
+            { id: 7, nama: 'Ice Age', deskripsi: 'Petualangan dingin zaman es.', harga: 60000, img: 'ice age.jpg' }
+        ];
+
+        let wahanaData = savedData ? JSON.parse(savedData) : defaultWahana;
+        let cart = [];
+        let selectedMethod = '';
+        let currentTargetId = null;
+
+        function renderMenu() {
+            const grid = document.getElementById('wahana-grid');
+            grid.innerHTML = wahanaData.map(w => `
+                <div class="bg-white rounded-2xl overflow-hidden shadow-md card-wahana flex flex-col relative">
+                    <div class="h-44 bg-gray-200 relative group">
+                        <!-- Tombol ganti foto per wahana -->
+                        <div onclick="triggerFilePicker(${w.id})" class="btn-change-individual">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        
+                        <img id="img-display-${w.id}" src="${w.img}" class="w-full h-full object-cover" 
+                             onerror="this.onerror=null; this.src='https://placehold.co/600x400?text=${w.nama.replace(' ', '+')}';">
+                        
+                        <div class="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded text-[10px] font-bold">
+                            Rp ${w.harga.toLocaleString()}
+                        </div>
+                    </div>
+                    <div class="p-4 flex-grow">
+                        <h3 class="font-bold text-base text-left">${w.nama}</h3>
+                        <p class="text-[10px] text-gray-500 mt-1 text-left">${w.deskripsi}</p>
+                    </div>
+                    <div class="p-3 border-t flex justify-between items-center bg-gray-50">
+                        <div class="flex items-center space-x-3 mx-auto">
+                            <button onclick="updateCart(${w.id}, -1)" class="w-7 h-7 rounded-full border border-gray-300 hover:bg-gray-200 transition">-</button>
+                            <span id="qty-${w.id}" class="font-bold text-sm">0</span>
+                            <button onclick="updateCart(${w.id}, 1)" class="w-7 h-7 rounded-full bg-secondary text-white shadow-sm hover:brightness-110 transition">+</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            createCheckoutButton();
+        }
+
+        // Fungsi untuk membuka pemilih file untuk wahana tertentu
+        function triggerFilePicker(id) {
+            currentTargetId = id;
+            document.getElementById('global-file-input').click();
+        }
+
+        // Menangani pemilihan file
+        document.getElementById('global-file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && currentTargetId) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const base64Image = event.target.result;
+                    const index = wahanaData.findIndex(w => w.id === currentTargetId);
+                    if (index !== -1) {
+                        wahanaData[index].img = base64Image;
+                        localStorage.setItem('wyndoria_wahana', JSON.stringify(wahanaData));
+                        document.getElementById(`img-display-${currentTargetId}`).src = base64Image;
+                    }
+                    // Reset input agar bisa memilih file yang sama lagi jika perlu
+                    e.target.value = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function updateCart(id, change) {
+            const item = cart.find(i => i.id === id);
+            if (item) {
+                item.qty = Math.max(0, item.qty + change);
+                if (item.qty === 0) cart = cart.filter(i => i.id !== id);
+            } else if (change > 0) {
+                cart.push({ ...wahanaData.find(w => w.id === id), qty: 1 });
+            }
+            document.getElementById(`qty-${id}`).innerText = cart.find(i => i.id === id)?.qty || 0;
+            const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
+            const float = document.getElementById('checkout-float');
+            if (totalQty > 0) {
+                float.classList.remove('hidden');
+                document.getElementById('cart-count').innerText = totalQty;
+            } else float.classList.add('hidden');
+        }
+
+        function createCheckoutButton() {
+            if (!document.getElementById('checkout-float')) {
+                const div = document.createElement('div');
+                div.id = 'checkout-float';
+                div.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden';
+                div.innerHTML = `<button onclick="goToPayment()" class="bg-primary text-white px-10 py-4 rounded-full shadow-2xl font-bold hover:scale-105 transition-transform">BAYAR TIKET (<span id="cart-count">0</span>)</button>`;
+                document.body.appendChild(div);
+            }
+        }
+
+        function goToPayment() {
+            document.getElementById('section-menu').classList.add('hidden');
+            document.getElementById('checkout-float').classList.add('hidden');
+            document.getElementById('section-payment').classList.remove('hidden');
+            let total = 0;
+            document.getElementById('payment-summary').innerHTML = cart.map(item => {
+                total += (item.harga * item.qty);
+                return `<div class="flex justify-between py-1 text-xs"><span>${item.nama} x ${item.qty}</span><span>Rp ${(item.harga * item.qty).toLocaleString()}</span></div>`;
+            }).join('') + `<div class="border-t mt-2 pt-2 flex justify-between font-bold"><span>Total</span><span>Rp ${total.toLocaleString()}</span></div>`;
+        }
+
+        function showMenu() {
+            document.getElementById('section-payment').classList.add('hidden');
+            document.getElementById('section-menu').classList.remove('hidden');
+            if(cart.length > 0) document.getElementById('checkout-float').classList.remove('hidden');
+        }
+
+        function selectMethod(method) {
+            selectedMethod = method;
+            document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('border-secondary', 'bg-blue-50'));
+            event.currentTarget.classList.add('border-secondary', 'bg-blue-50');
+            document.getElementById('qr-area').classList.toggle('hidden', method === 'CASH');
+            document.getElementById('cash-area').classList.toggle('hidden', method !== 'CASH');
+        }
+
+        function processFinal() {
+            document.getElementById('section-payment').classList.add('hidden');
+            document.getElementById('section-receipt').classList.remove('hidden');
+            const now = new Date();
+            document.getElementById('receipt-date').innerText = now.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
+            const id = 'WYN' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            document.getElementById('order-id').innerText = id;
+            document.getElementById('receipt-method').innerText = selectedMethod;
+            let total = 0;
+            document.getElementById('receipt-items').innerHTML = cart.map(item => {
+                total += (item.harga * item.qty);
+                return `<div class="flex justify-between"><span>${item.nama} (${item.qty}x)</span><span>${(item.harga * item.qty).toLocaleString()}</span></div>`;
+            }).join('');
+            document.getElementById('receipt-total').innerText = 'Rp ' + total.toLocaleString();
+        }
+
+        function downloadReceipt() {
+            const receipt = document.getElementById('receipt-to-download');
+            html2canvas(receipt, { scale: 3 }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Struk_Wyndoria_${document.getElementById('order-id').innerText}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+        }
+
+        window.onload = renderMenu;
+    </script>
+</body>
+</html>
